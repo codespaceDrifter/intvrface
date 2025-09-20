@@ -22,13 +22,6 @@ client = Anthropic(
     api_key = os.getenv("ANTHROPIC_API_KEY")
 )
 
-TOOLS = ["tools.add_test"]
-mcp = FastMCP("intvrface_suite")
-for tool in TOOLS:
-    # returns actual module object to call functions inside it
-    module = import_module(tool)
-    module.register(mcp)
-
 
 def call_claude(message):
     try:
