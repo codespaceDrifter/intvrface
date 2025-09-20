@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "intvrface_suite": {
+      "command": "python3",
+      "args": [
+        "./mcp_server.py"
+      ],
+      "transport": "stdio"
+    }
+  }
+}
