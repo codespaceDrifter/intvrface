@@ -1,0 +1,90 @@
+.chat-popup {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%;
+  height: 100%;
+  background: var(--component);
+  border: 2px solid var(--green);
+  border-radius: 8px;
+  flex-direction: column;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.chat-popup.active {
+  display: flex;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+#chat-input-box {
+  display: flex;
+  gap: 8px;
+  height: 70px;
+  background: var(--component);
+  border: 2px solid var(--component-light);
+  border-radius: 8px;
+  color: var(--white);
+  padding: 10px;
+  resize: none;
+  overflow: hidden;
+}
+
+#chat-input-box:focus {
+  outline: none;
+}
+
+#companion-chat-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--green);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.message-claudy {
+  background: var(--component);
+  padding: 10px;
+  margin: 20px 0px;
+  color: var(--pink);
+}
+
+.message-user {
+  background: var(--component-light);
+  padding: 10px;
+  margin: 20px 0px;
+
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  color: var(--lavender);
+  border-radius: 8px;
+}
+
+.message-user ul, .message-user ol,
+.message-assistant ul, .message-assistant ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-user pre, .message-assistant pre {
+  background: var(--component-light);
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
