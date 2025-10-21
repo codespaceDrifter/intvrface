@@ -6,13 +6,19 @@
   <title>intvrface</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/index.css">
+  <script src="js/board.js" defer></script>
+  <script src="js/card.js" defer></script>
   <script type = "module" src="js/index.js" defer></script>
 </head>
 <body>
-  <button class="chat-btn" id="companion-chat-btn">💬</button>
-  <div class="chat-popup">
-    <div class="chat-messages" id="messages"></div>
-    <textarea id="chat-input-box"></textarea>
+  <div class="infinite-board">
+
+    <div class="claudy-card" id = "companion-card" data-claudy="companion">
+      <div class="claudy-messages"></div>
+      <textarea class="claudy-input"></textarea>
+      <div class="resize-handle"></div>
+    </div>
+
   </div>
 </body>
 </html>

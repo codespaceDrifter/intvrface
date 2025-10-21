@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from chat.chat import user_send_message, get_messages
+from chat.chat import CREATE_message, READ_message, READ_messages
 from pydantic import BaseModel
+from fastapi import WebSocket
+from chat.socket_manager import socket_manager 
+import json
+
 
 # serve with: uvicorn main:app --reload --port 8000
 
@@ -16,19 +20,18 @@ app.add_middleware(
 )
 
 
-class MessagePydantic(BaseModel):
-    role: str
-    content: str
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    socket_manager.set_connection(websocket)
+    await websocket.accept()
+    # the blocks the main thread. so all agents needs to run in side threads
 
-class MessagesPydantic(BaseModel):
-    messages: list[MessagePydantic]
+    while True:
+        data = await websocket.receive_text()
+        data_dict = json.loads(data)
+        
+        if data_dict['type'] == 'CREATE_message':
+            CREATE_message(data_dict)
 
-@app.get("/chat/{claudy_name}")
-def get_messages_endpoint(claudy_name: str):
-    stream_context = get_messages(claudy_name)
-    return MessagesPydantic(messages=stream_context)
-
-@app.post("/chat/{claudy_name}")
-def chat_endpoint(claudy_name: str, message: MessagePydantic):
-    claudy_messages = user_send_message(claudy_name, message.model_dump())
-    return MessagesPydantic(messages=claudy_messages)
+        elif data_dict['type'] == 'READ_messages':
+            READ_messages(data_dict)

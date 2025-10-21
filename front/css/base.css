@@ -23,6 +23,9 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: 'Menlo', 'Consolas', monospace;
+  line-height: 1.5;
+  font-size: 16px;
 }
 
 html, body {
@@ -31,6 +34,11 @@ html, body {
   display: flex;
   background-color: var(--background);
   color: var(--white);
+  overflow: hidden;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 ul {

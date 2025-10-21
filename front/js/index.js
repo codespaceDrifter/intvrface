@@ -1,79 +1,98 @@
 import { marked } from '../node_modules/marked/lib/marked.esm.js';
 
-
-console.log('Script loaded');
-console.log('Gotten:', document.getElementById('companion-chat-btn'));
+console.log(`index.js loaded`);
 
 
 
-document.getElementById('companion-chat-btn').addEventListener('click', toggleChat);
 
-function toggleChat() {
-  const chatPopup = document.querySelector('.chat-popup');
-  chatPopup.classList.toggle('active');
-  if (chatPopup.classList.contains('active')) {
-    document.querySelector('#chat-input-box').focus();
-    loadChat();
-  }
-}
-
-document.querySelector('#chat-input-box').addEventListener('input', function() {
-  this.style.height = '70px';
-  this.style.height = this.scrollHeight + 'px';
+// chat input box
+document.querySelectorAll('.claudy-input').forEach(element =>{
+    element.addEventListener('input', function() {
+    element.style.height = '50px'; 
+    element.style.height = element.scrollHeight + 'px';
+    });    
 });
 
-document.querySelector('#chat-input-box').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    send();
-  }
+document.querySelectorAll('.claudy-input').forEach(element =>{
+    element.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        //TODO: get the target claudy name from the button that was clicked
+        const claudyName = element.closest('.claudy-card').dataset.claudy;
+        const content = element.value.trim();
+        if (!content) return;
+        CREATE_message(claudyName, {role: 'user', content: content});
+        element.value = '';
+    }
+    });
 });
 
-async function loadChat(target_claudy_name = "companion") {
-    addTempMessage('assistant', 'Loading...');
-    const response = await fetch(`http://localhost:8000/chat/${target_claudy_name}`);
-    const data = await response.json();
-    renderMessages(data.messages);
-}
 
-async function send(target_claudy_name = "companion") {
-  const text = document.querySelector('#chat-input-box').value.trim();
-  if (!text) return;
-  const user_message = {role: 'user', content: text};
-  document.querySelector('#chat-input-box').value = '';
-  document.querySelector('#chat-input-box').style.height = '70px';
-
-  // temporarily display a user message and waiting message
-  addTempMessage('user', text);
-  addTempMessage('assistant', 'inferencing...');
-  
-  // get response from backend and render all messages
-  const response = await fetch(`http://localhost:8000/chat/${target_claudy_name}`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(user_message)
-  }).then(response => response.json()).then(data => {
-    renderMessages(data.messages);
-  });
-}
-
-function addTempMessage(role, content) {
-  const messagesContainer = document.getElementById('messages');
-  const div = document.createElement('div');
-  div.className = `message-${role}`;
-  div.innerHTML = marked.parse(content);
-  messagesContainer.appendChild(div);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-function renderMessages(messages) {
-  const messagesContainer = document.getElementById('messages');
-  messagesContainer.innerHTML = '';
-  messages.forEach(message => {
+// render messages to screen
+function renderMessage(claudyName, message) {
+    const claudyCard = document.querySelector(`.claudy-card[data-claudy="${claudyName}"]`);
+    const messagesContainer = claudyCard.querySelector('.claudy-messages');
     const div = document.createElement('div');
     div.className = `message-${message.role}`;
     div.innerHTML = marked.parse(message.content);
     messagesContainer.appendChild(div);
-  });
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
+
+function renderMessages(claudyName, messages) {
+    console.log(claudyName)
+    const claudyCard = document.querySelector(`.claudy-card[data-claudy="${claudyName}"]`);
+    const messagesContainer = claudyCard.querySelector('.claudy-messages');
+    messagesContainer.innerHTML = '';
+    messages.forEach(message => {
+        renderMessage(claudyName, message);
+    });
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+
+// web socket
+const ws = new WebSocket('ws://localhost:8000/ws');
+
+async function READ_messages(claudyName) {
+    console.log(`READ_messages: ${claudyName}`);
+    ws.send(JSON.stringify({
+        type: 'READ_messages',
+        claudy_name: claudyName
+    }));
+}
+
+async function CREATE_message(claudyName, message) {
+    console.log(`CREATE_message: ${claudyName}`);
+
+    renderMessage(claudyName, message);
+
+    ws.send(JSON.stringify({
+        type: 'CREATE_message',
+        claudy_name: claudyName,
+        message: message
+    }));
+}
+
+ws.onmessage = (event) => {
+    const data_dict = JSON.parse(event.data);
+    switch (data_dict.type) {
+        case 'READ_message':
+            renderMessage(data_dict.claudy_name, data_dict.message);
+            break;
+        case 'READ_messages':
+            renderMessages(data_dict.claudy_name, data_dict.messages);
+            break;
+    }
+};
+
+
+// on start up
+ws.onopen = () => {
+    console.log(`ws connected`);
+    document.querySelectorAll('.claudy-card').forEach(card => {
+        console.log(`on start up loading all chats`);
+        const claudyName = card.dataset.claudy;
+        READ_messages(claudyName);
+    });
+};

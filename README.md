@@ -26,16 +26,17 @@ interact with user through voice chat
 this is a claudy context that is like a normal chat webpage. it never gets deleted and it has voice chat.  
 this claudy should know EVERYTHING about the user over time and also all the project descriptions.  
 
-auto context summary feature: 
+"MEMORY FEATURE"  
+
+the model should auto summarize a working memory and note down permanent memories.
+
 original_tokens: jsonl made up of the latest model output / inputs from documents, web searches, terminal results
-summarized_tokens: once original tokens reaches 20k, prompt model to summarize it into around 1k tokens. 
-streaming_tokens: what the model actually sees. made up of like 10 past summarized_token chunks and the latest original tokens
-permanent_tokens: say there are 10 summarized token slots. there would be one permanent token slot that is a .md file not a jsonl that the outdated summarized tokens gets prompted to write crucial information into. this would be project.md or some user description .md like interests.md or relationship.md. for common_claudy it will have to write to all different project.md files and also the user .md files. for agent claudies maybe they only have a like a specific task.md to read and write to.  
-the streaming tokens should be visible when clicked so i can see the same things the model sees and when i click something. overall streaming tokens format is:  
-prompt  
-permanent tokens (all of it)  
-summarized tokens (latest 5 paragraphs) 
-original tokens (latest < 20k tokens )  
+
+streaming_tokens: what the model actually sees. made up of the latest original_tokens. when they get above a certain threshhold i.e. 50k summarize them into a condensed version 2k. for the 50k start counting from the beginning to the 3 messages back. keep the last 3 messages original always cause they are more important.  
+
+actually the permanent tokens is a file edit. completely seperate from the previous stuff.  
+
+permanent_tokens: there would be one permanent token slot that is a .md file not a jsonl. this will be used as a MCP tool that the model can just read and write from. for common_claudy it will have to write to all different project.md files and also the user .md files. for agent claudies maybe they only have a like a specific task.md to read and write to.  
 
 these for common claudy will be stored in data/commom  
 
@@ -68,6 +69,12 @@ maybe later i ask common claudy to work as a reviewer approval but for now the u
 you should be able to click an agent and see exactly what context it is drawing from, and it's current computer screen (terminal or GUI)
 
 maybe later i do a um seperate folder enviroment and a complete autonomy mode where common_claudy does not talk to me but just does what ITSELF wants to do and make it's own projects.  
+
+
+#### CONTEXT FEATURE? 
+now that i think about it since im already dragging um agents around why not just add some manual context management. contexts can be blocks that um agents can be connected to. so like rather than a common claudy i have a common "context" that is some .md files. i can also use this to manage um access. like READ or WRITE access to contexts. i can also use this to manage anthropic skills or MCP access or enviroments (which folders it can write code in)
+
+EACH project is a PAGE / BOARD. in each BOARD there is CONTEXTS, MODELS, PROMPTS, ENVIROMENTS, TOOLS. the "companion" claudy is just a page with no specific project / enviroment. also um it's context is shared with other boards. 
 
 
 

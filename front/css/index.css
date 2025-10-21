@@ -1,66 +1,97 @@
-.chat-popup {
+.infinite-board {
+  position: absolute;
+  overflow: hidden;
+  cursor: grab;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--background),
+    var(--component) 100px
+  );
+}
+
+.infinite-board::-webkit-scrollbar {
   display: none;
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 85%;
-  height: 100%;
-  background: var(--component);
-  border: 2px solid var(--green);
-  border-radius: 8px;
+}
+
+.infinite-board:active {
+  cursor: grabbing;
+}
+
+
+
+
+.claudy-card {
+  position: absolute;
+  width: 300px;
+  height: 150px;
+  display: flex;
   flex-direction: column;
-  padding: 20px;
+  transform: translate(-50%, -50%);
+  background: var(--component);
+  border: 2px solid var(--component-light);
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.claudy-card.expanded {
+  width: 80vw!important;
+  height: 80vh!important;
   z-index: 1000;
 }
 
-.chat-popup.active {
-  display: flex;
+#companion-card {
+  top: 52%;
+  left: 52%;
 }
 
-.chat-messages {
-  flex: 1;
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-left: 20px solid transparent;
+  border-bottom: 20px solid var(--component-light);
+  border-bottom-right-radius: 8px;
+  cursor: nwse-resize;
+}
+
+.claudy-messages {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
-  margin-bottom: 16px;
-  padding: 12px;
-  border-radius: 4px;
+  flex: 1;
 }
 
-#chat-input-box {
+.claudy-messages::-webkit-scrollbar {
+  display: none;
+}
+
+.claudy-input {
   display: flex;
-  gap: 8px;
-  height: 70px;
   background: var(--component);
   border: 2px solid var(--component-light);
   border-radius: 8px;
   color: var(--white);
-  padding: 10px;
   resize: none;
   overflow: hidden;
+
+  width: 100%;
+  align-self: flex-end;
+  margin: 2% 0%;
 }
 
-#chat-input-box:focus {
+.claudy-input:focus {
   outline: none;
+  border: 2px solid var(--lavender);
 }
 
-#companion-chat-btn {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: var(--green);
-  border: 2px solid var(--green);
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.message-claudy {
+.message-assistant {
   background: var(--component);
   padding: 10px;
   margin: 20px 0px;
-  color: var(--pink);
+  color: var(--white);
 }
 
 .message-user {
@@ -87,4 +118,8 @@
   border-radius: 4px;
   overflow-x: auto;
   margin: 10px 0;
+}
+
+.message-user a, .message-assistant a {
+  color: var(--mint);
 }
