@@ -1,16 +1,13 @@
 import { marked } from '../node_modules/marked/lib/marked.esm.js';
 
-console.log(`index.js loaded`);
-
-
-
+console.log(`claudy.js loaded`);
 
 // chat input box
 document.querySelectorAll('.claudy-input').forEach(element =>{
     element.addEventListener('input', function() {
-    element.style.height = '50px'; 
+    element.style.height = '50px';
     element.style.height = element.scrollHeight + 'px';
-    });    
+    });
 });
 
 document.querySelectorAll('.claudy-input').forEach(element =>{
@@ -18,7 +15,7 @@ document.querySelectorAll('.claudy-input').forEach(element =>{
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         //TODO: get the target claudy name from the button that was clicked
-        const claudyName = element.closest('.claudy-card').dataset.claudy;
+        const claudyName = element.closest('.card.claudy').dataset.claudy;
         const content = element.value.trim();
         if (!content) return;
         CREATE_message(claudyName, {role: 'user', content: content});
@@ -30,7 +27,7 @@ document.querySelectorAll('.claudy-input').forEach(element =>{
 
 // render messages to screen
 function renderMessage(claudyName, message) {
-    const claudyCard = document.querySelector(`.claudy-card[data-claudy="${claudyName}"]`);
+    const claudyCard = document.querySelector(`.card.claudy[data-claudy="${claudyName}"]`);
     const messagesContainer = claudyCard.querySelector('.claudy-messages');
     const div = document.createElement('div');
     div.className = `message-${message.role}`;
@@ -41,7 +38,7 @@ function renderMessage(claudyName, message) {
 
 function renderMessages(claudyName, messages) {
     console.log(claudyName)
-    const claudyCard = document.querySelector(`.claudy-card[data-claudy="${claudyName}"]`);
+    const claudyCard = document.querySelector(`.card.claudy[data-claudy="${claudyName}"]`);
     const messagesContainer = claudyCard.querySelector('.claudy-messages');
     messagesContainer.innerHTML = '';
     messages.forEach(message => {
@@ -90,7 +87,7 @@ ws.onmessage = (event) => {
 // on start up
 ws.onopen = () => {
     console.log(`ws connected`);
-    document.querySelectorAll('.claudy-card').forEach(card => {
+    document.querySelectorAll('.card.claudy').forEach(card => {
         console.log(`on start up loading all chats`);
         const claudyName = card.dataset.claudy;
         READ_messages(claudyName);

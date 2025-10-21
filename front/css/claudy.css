@@ -1,62 +1,14 @@
-.infinite-board {
-  position: absolute;
-  overflow: hidden;
-  cursor: grab;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--background),
-    var(--component) 100px
-  );
-}
-
-.infinite-board::-webkit-scrollbar {
-  display: none;
-}
-
-.infinite-board:active {
-  cursor: grabbing;
-}
-
-
-
-
-.claudy-card {
-  position: absolute;
-  width: 300px;
-  height: 150px;
-  display: flex;
-  flex-direction: column;
-  transform: translate(-50%, -50%);
+/* Claudy coloring/theming */
+.claudy {
   background: var(--component);
   border: 2px solid var(--component-light);
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 10px;
 }
 
-.claudy-card.expanded {
-  width: 80vw!important;
-  height: 80vh!important;
-  z-index: 1000;
-}
-
-#companion-card {
-  top: 52%;
-  left: 52%;
-}
-
-.resize-handle {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-left: 20px solid transparent;
+.claudy .resize-handle {
   border-bottom: 20px solid var(--component-light);
-  border-bottom-right-radius: 8px;
-  cursor: nwse-resize;
 }
 
+/* Claudy messages structure */
 .claudy-messages {
   display: flex;
   flex-direction: column;
@@ -68,6 +20,7 @@
   display: none;
 }
 
+/* Claudy input structure and coloring */
 .claudy-input {
   display: flex;
   background: var(--component);
@@ -87,6 +40,7 @@
   border: 2px solid var(--lavender);
 }
 
+/* Claudy message styling */
 .message-assistant {
   background: var(--component);
   padding: 10px;

@@ -74,6 +74,12 @@ maybe later i do a um seperate folder enviroment and a complete autonomy mode wh
 #### CONTEXT FEATURE? 
 now that i think about it since im already dragging um agents around why not just add some manual context management. contexts can be blocks that um agents can be connected to. so like rather than a common claudy i have a common "context" that is some .md files. i can also use this to manage um access. like READ or WRITE access to contexts. i can also use this to manage anthropic skills or MCP access or enviroments (which folders it can write code in)
 
+(summary token trigger for original tokens only. prompt is its own thing and permanent memories are reads and writes. which if read will BECOME original tokens that could be summarized.)
+
+(companion claudy is just a common context. a folder with a bunch of .md files about the user. that EVERY AGENT can read across boards. companion claudy liuves on the PROJECTS page rather than a specific project board. companion claudy WRITE access to common library folder and others don't. do NOT do that weird thing where you put like a project description from the common into the project. too complicated. just manually copy if need.)
+
+later advanced feature: wrap everything with gits and allow version travel with git erasily and allow diff viewing with git.
+
 EACH project is a PAGE / BOARD. in each BOARD there is CONTEXTS, MODELS, PROMPTS, ENVIROMENTS, TOOLS. the "companion" claudy is just a page with no specific project / enviroment. also um it's context is shared with other boards. 
 
 
