@@ -18,9 +18,34 @@
   background: var(--component-light);
   color: var(--white);
   border: none;
-  padding: 10px;
-  margin: 10px;
+  width: 3rem;
+  height: 3rem;
   cursor: pointer;
+}
+
+.claudy-button.toggle.running {
+  background-color: #ff6961;  /* red-ish for pause */
+}
+
+.claudy-button.toggle::before {
+  content: "⏸";
+}
+
+.claudy-button.toggle:not(.running) {
+  background-color: #77dd77;  /* green-ish for start */
+}
+
+.claudy-button.toggle:not(.running)::before {
+  content: "▶";
+}
+
+.claudy-button.summarize {
+  background-color: var(--lavender);
+  color: var(--background);
+}
+
+.claudy-button.summarize::before {
+  content: "S";
 }
 
 

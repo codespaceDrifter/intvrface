@@ -21,7 +21,7 @@ board.addEventListener('mousedown', (e) => {
 
 board.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-  });
+});
 
 document.addEventListener('mousemove', (e) => {
     if (isDraggingBoard) {
@@ -48,6 +48,7 @@ console.log('cardy.js loaded');
 document.querySelectorAll('.card').forEach(card => {
     card.addEventListener('dblclick', function(e) {
         if (e.target.closest('.resize-handle')) return;
+        if (e.target.closest('.claudy-button')) return;
 
         if (this.classList.contains('expanded')) {
             this.classList.remove('expanded');
