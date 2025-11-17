@@ -20,8 +20,8 @@
 /* Card structure styles */
 .card {
   position: absolute;
-  width: 300px;
-  height: 150px;
+  width: 400px;
+  height: 200px;
   display: flex;
   flex-direction: column;
   transform: translate(-50%, -50%);

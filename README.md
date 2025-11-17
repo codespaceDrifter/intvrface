@@ -1,94 +1,51 @@
 ### the intvrface for the model to interact with the world
 
-### intvrface allows claudy to:  
+this is the wrapper around an AI model whether that is the powerful primy model that starts the utopia bootstrap or just a normal general model like claudy   
+the model needs a software layer to interact with the computer for both capability and safety monitoring  
 
+
+### intvrface allows the model to
+
+call programs via MCP (all following tools should be wrapped in MCP)  
 control a computer via terminal  
 control a computer via GUI  
 use anthropic agent sdk: file edit tools  
-use MCP: custom tools. i.e. my other projects like svmbolsolve and phvsicsim over api.  
-
-manage context better and hold long term memory in jsonl with auto context summarization and note editing    
-streaming context made up of original tokens, summarized tokens, permanent tokens   
-display streaming context  
-
-plan tasks (user controlled)  
-launch parallel agents for parallel tasks  
-
-UI to monitor agent progress
-
-interact with user through voice chat  
+UI for humans to monitor and manage multi agent progress  
+voice chat to speak with humans  
+custom MCPs (todo, svmbolcore, phvsicsim)
 
 
-### features:
+### memory functionality
 
-#### common claudy
-
-this is a claudy context that is like a normal chat webpage. it never gets deleted and it has voice chat.  
-this claudy should know EVERYTHING about the user over time and also all the project descriptions.  
-
-"MEMORY FEATURE"  
-
-the model should auto summarize a working memory and note down permanent memories.
-
-original_tokens: jsonl made up of the latest model output / inputs from documents, web searches, terminal results
-
-streaming_tokens: what the model actually sees. made up of the latest original_tokens. when they get above a certain threshhold i.e. 50k summarize them into a condensed version 2k. for the 50k start counting from the beginning to the 3 messages back. keep the last 3 messages original always cause they are more important.  
-
-actually the permanent tokens is a file edit. completely seperate from the previous stuff.  
-
-permanent_tokens: there would be one permanent token slot that is a .md file not a jsonl. this will be used as a MCP tool that the model can just read and write from. for common_claudy it will have to write to all different project.md files and also the user .md files. for agent claudies maybe they only have a like a specific task.md to read and write to.  
-
-these for common claudy will be stored in data/commom  
-
-maybe i will later add an mcp that draws connection between the actual original thoughts and tokens with the summarized and allow the model to inspect original but not now.  
-
-for the common claudy only as opposed to the agent claudy generates like "user basic information", "project svmbolsolve", "project mindology", "user end goals and motivations" etc. and store them in the data/core_memory.jsonl file. this further a summarized version of the previously summarized context. many things could be omitted like trivial questions or whatever.   
-
-you should be able to something to see exactly what context claudy is reading from. 
-the dark green chat button should exist in all three pages
-
-#### projects and tasks (page 2)
-
-basically a to do app of different projects. these are all parallel relationship but you can click and drag then to sort of indicate a relationship. like mindology, svmbolsolve, different specific coding projects, etc. all projects. projects are folders on the local computer. they are mostly coding projects but could also be research projects with a lot of .md files. it must have a git. 
-
-each projects when double clicked goes to the next page. 
+(some additional functionality for frozen weights token discretized transformers which i imagine primy won't be and won't need but claudy for now does)
 
 
-#### agents (page 3)
+better context management with auto summarization  
+note editing tools for long term continual learning  
+MCTS creative solution exploration
 
-each project has tasks. tasks can also have tasks. this can be a parallel relationship or a serial relationship. defined through a direct acylic tree defined through an adjacency list and stored as json in data/common/tvdo.json  
-each agent is a claudy instance and context associated with a task. one to one relationship. if task is complex and parallel break it into subtasks and launch an agent for each  
-each agent has a folder named data/project/task_name. the original context and auto summarized contexts are stored as jsonl in this folder.  
-each agent also has a user chat interrupt system if the user intervenes. but mostly it should be autonomous  
-maybe i will implement common claudy intervening later as a reviewer but for now agent should self review  
-each agent should have a docker for computer use. the computer use features are said before in the "intvrface allows claudy to" section. each agent should have a git branch it works on and clear goals so it doesn't mess up other files it's not supposed to touch  
-each task agent should be visible like i should be able to click the task and it expands and i see exactly what it is doing. including a split screen like a terminal/GUI and a thought page of current token outpus with context on top. note that context could change i want to see the context it is reading from not just all the past tokens.   
-maybe later i give a sub tvdo chart MCP to the model just for it to plan better? one that is only for it to use.  
-each coding agent importantly must have a self enforced testing loop where it runs the code and writes the tests and sees the code pass the test or if it's frontend see the code looks right in the GUI and then stop only when everything looks ok.  
-maybe later i ask common claudy to work as a reviewer approval but for now the user will review things and give feedback  
-you should be able to click an agent and see exactly what context it is drawing from, and it's current computer screen (terminal or GUI)
+description of implementation of context management:  
 
-maybe later i do a um seperate folder enviroment and a complete autonomy mode where common_claudy does not talk to me but just does what ITSELF wants to do and make it's own projects.  
+original_context.jsonl: all model outputs and environment data goes here  
 
+streaming_context.jsonl: what the model reads from. everything added to original context also added here.  
 
-#### CONTEXT FEATURE? 
-now that i think about it since im already dragging um agents around why not just add some manual context management. contexts can be blocks that um agents can be connected to. so like rather than a common claudy i have a common "context" that is some .md files. i can also use this to manage um access. like READ or WRITE access to contexts. i can also use this to manage anthropic skills or MCP access or enviroments (which folders it can write code in)
+summarized_context.jsonl: once the token count that goes from the beginning of streaming_context.jsonl to the last five messages from the end reaches like 40k, a specialized prompt gets auto triggered and the model will summarize the 40k context into something like < 2k words. the summary goes into summarized.jsonl. and the streaming_context jsonl becomes that summarized context plus the last five messages.   
 
-(summary token trigger for original tokens only. prompt is its own thing and permanent memories are reads and writes. which if read will BECOME original tokens that could be summarized.)
+note that original_context.jsonl and summarized_context.jsonl are only for logging and monitoring purposes and the model always only reads from streaming_context.jsonl.   
 
-(companion claudy is just a common context. a folder with a bunch of .md files about the user. that EVERY AGENT can read across boards. companion claudy liuves on the PROJECTS page rather than a specific project board. companion claudy WRITE access to common library folder and others don't. do NOT do that weird thing where you put like a project description from the common into the project. too complicated. just manually copy if need.)
+description of implementation of note taking:  
+this is basically a file edit but just prompted to allow the model to take long term notes in different .md files. and also read them, reading them just adds them to the context like other outputs from function calls.  
 
-later advanced feature: wrap everything with gits and allow version travel with git erasily and allow diff viewing with git.
-
-EACH project is a PAGE / BOARD. in each BOARD there is CONTEXTS, MODELS, PROMPTS, ENVIROMENTS, TOOLS. the "companion" claudy is just a page with no specific project / enviroment. also um it's context is shared with other boards. 
-
+description of implementation of MCTS:  
+to be determined
 
 
 ### tech stack:
 the goal is maximal simplicity and transparency.  
 frontend we are using pure html css js.   
 for backend we are using python and fastapi  
-for databse we are using jsonl  
+for database we are using jsonl  
 for agent launching later we are using docker.  
 we should use anthropic agent sdk as much as possible and avoid rewriting things  
 
@@ -97,12 +54,8 @@ we should use anthropic agent sdk as much as possible and avoid rewriting things
 we are using the infinite scroll zoom board design. with components being horizontal rectangles. with the techno paradisal theme in base.css.   
 background and component is gray themed, with text and border being a pastel / neon color. different colors symbolize different states.  
 
-in the projects page:  
-bottom right: "chat"  : dark green (dark green for common context never deleted)  
-tasks: light terminal neon green (light green for specific agent context deleted after sub task complete)
-
 in the agent page: 
-not started: gray.  
+not working: gray.  
 learning (reading files, searching files, web searching, GUI seeing results): purple  
 thinking (reasoning): blue  
 acting (coding, executing files): orange  
@@ -110,19 +63,14 @@ done: black
 subtasks are organized left to right according to dependency
 
 
-# gradual to do:
-this will be built version by version. each time with more features / better design. 
+### future functionality
 
-# version 1
+model wrapper rather than just claude api
 
-chat page UI. anthropic api chat. common_claudy prompt. auto context gen. the 4 context divide. original_tokens.jsonl, summarized_tokens.jsonl, permanent_tokens.jsonl, and streaming_tokens.jsonl, each with their own prompts. ok make it so only the PROMPT for common claudy and agent claudy is different. so the prompt of common claudy asks for it to remeber in permanent memory the um user facts and all project facts and for agent claudy it only ask it to remember important coding project specific facts and um like web search result for new repos or something. the important thing is i should see to be DRY and use the same structure for different things. also the tvdo should be the same structure for each project to task relationship but also for each individual agent. maybe permanent memory is in .MD format not jsonl? and note that the project.MD for each project is shared between common claudy and agent claudy.   
-yeah basically the first page UI and backend.  
-chat with common claudy, 4 context jsonls in data, projects and projects mds
+a special permanent conversational claudy that is undeletable and just better tuned to talk with the user and take notes on user information. no computer control or MCP for this one.  
 
+a project page. each project is a folder that is clickable that goes to another page. each project page can contain MULTIPLE agents. this follows a sort of to do app graph of parallel tasks and serial tasks. different agents can work on the parallel tasks at the same time.  
 
-# version 2
-add voice chat. make sure it is LOCAL not over api. voice chat with common claudy.  
-add the tvdo tasks. and their seperate claudies, page 2.   
+maybe mech interp visualization?
 
-# version 3
-terminal control. file edits. git branches each agent has one
+although maybe later i can do more functionality that allow the model to go back and read original context or for the streaming context to be like the last 5 summarized contexts plus some original context and only prompt the model to summarize original context (don't summarize summaries).     

@@ -1,8 +1,6 @@
 import os
 import json
 import subprocess
-from anthropic import Anthropic
-from dotenv import load_dotenv
 
 
 class MCP_bridge:

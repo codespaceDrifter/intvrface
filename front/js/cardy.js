@@ -97,8 +97,9 @@ document.addEventListener('mouseup', () => {
 // Card resizing
 let isResizing = false;
 let resizingCard = null;
-let resizeStartX, resizeStartY, startWidth, startHeight;
-
+let resizeStartX, resizeStartY, startWidth, startHeight, startLeft, startTop;
+const minWidth = 400;
+const minHeight = 200;
 document.querySelectorAll('.resize-handle').forEach(handle => {
   handle.addEventListener('mousedown', (e) => {
     e.stopPropagation();
@@ -108,18 +109,24 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
     resizeStartY = e.clientY;
     startWidth = resizingCard.offsetWidth;
     startHeight = resizingCard.offsetHeight;
+    startLeft = resizingCard.offsetLeft;
+    startTop = resizingCard.offsetTop;
   });
 });
-
 document.addEventListener('mousemove', (e) => {
   if (isResizing) {
     const deltaX = e.clientX - resizeStartX;
     const deltaY = e.clientY - resizeStartY;
-    resizingCard.style.width = (startWidth + 2*deltaX) + 'px';
-    resizingCard.style.height = (startHeight + 2*deltaY) + 'px';
-  }
+    const newWidth = Math.max(minWidth, startWidth + deltaX);
+    const newHeight = Math.max(minHeight, startHeight + deltaY);
+    resizingCard.style.width = newWidth + 'px';
+    resizingCard.style.height = newHeight + 'px';
+    const newLeft = Math.max(startLeft, startLeft + 0.5*deltaX);
+    const newTop = Math.max(startTop, startTop + 0.5*deltaY);
+    resizingCard.style.left = newLeft + 'px';
+    resizingCard.style.top = newTop + 'px';
+  } 
 });
-
 document.addEventListener('mouseup', () => {
   isResizing = false;
 });

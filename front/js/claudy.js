@@ -5,8 +5,8 @@ console.log(`claudy.js loaded`);
 // chat input box
 document.querySelectorAll('.claudy-input').forEach(element =>{
     element.addEventListener('input', function() {
-    element.style.height = '50px';
-    element.style.height = element.scrollHeight + 'px';
+        element.style.height = '50px';
+        element.style.height = element.scrollHeight + 'px';
     });
 });
 
@@ -22,6 +22,37 @@ document.querySelectorAll('.claudy-input').forEach(element =>{
         element.value = '';
     }
     });
+});
+
+
+document.querySelectorAll('.card.claudy').forEach(card => {
+    const claudyName = card.dataset.claudy;
+
+    card.querySelector('.claudy-button.start')
+        .addEventListener('click', () => {
+            console.log(`START_agent: ${claudyName}`);
+            ws.send(JSON.stringify({
+                type: 'START_agent',
+                claudy_name: claudyName,
+            }));
+        });
+
+    card.querySelector('.claudy-button.stop')
+        .addEventListener('click', () => {
+            ws.send(JSON.stringify({
+                type: 'STOP_agent',
+                claudy_name: claudyName,
+            }));
+        });
+
+    // For summarize later:
+    card.querySelector('.claudy-button.summarize')
+        .addEventListener('click', () => {
+            ws.send(JSON.stringify({
+                type: 'SUMMARIZE_agent',
+                claudy_name: claudyName,
+            }));
+        });
 });
 
 
