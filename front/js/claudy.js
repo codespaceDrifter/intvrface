@@ -3,12 +3,6 @@ import { marked } from '../node_modules/marked/lib/marked.esm.js';
 console.log(`claudy.js loaded`);
 
 // chat input box
-document.querySelectorAll('.claudy-input').forEach(element =>{
-    element.addEventListener('input', function() {
-        element.style.height = '50px';
-        element.style.height = element.scrollHeight + 'px';
-    });
-});
 
 document.querySelectorAll('.claudy-input').forEach(element =>{
     element.addEventListener('keydown', function(e) {
@@ -24,7 +18,14 @@ document.querySelectorAll('.claudy-input').forEach(element =>{
     });
 });
 
+document.querySelectorAll('.claudy-input').forEach(element =>{
+    element.addEventListener('input', function() {
+        element.style.height = '50px';
+        element.style.height = element.scrollHeight + 'px';
+    });
+});
 
+// claudy buttons start, stop, summarize
 document.querySelectorAll('.card.claudy').forEach(card => {
     const claudyName = card.dataset.claudy;
 
@@ -32,7 +33,7 @@ document.querySelectorAll('.card.claudy').forEach(card => {
         .addEventListener('click', () => {
             console.log(`START_agent: ${claudyName}`);
             ws.send(JSON.stringify({
-                type: 'START_agent',
+                request_type: 'START_agent',
                 claudy_name: claudyName,
             }));
         });
@@ -40,7 +41,7 @@ document.querySelectorAll('.card.claudy').forEach(card => {
     card.querySelector('.claudy-button.stop')
         .addEventListener('click', () => {
             ws.send(JSON.stringify({
-                type: 'STOP_agent',
+                request_type: 'STOP_agent',
                 claudy_name: claudyName,
             }));
         });
@@ -49,7 +50,7 @@ document.querySelectorAll('.card.claudy').forEach(card => {
     card.querySelector('.claudy-button.summarize')
         .addEventListener('click', () => {
             ws.send(JSON.stringify({
-                type: 'SUMMARIZE_agent',
+                request_type: 'SUMMARIZE_agent',
                 claudy_name: claudyName,
             }));
         });
@@ -85,7 +86,7 @@ const ws = new WebSocket('ws://localhost:8000/ws');
 async function READ_messages(claudyName) {
     console.log(`READ_messages: ${claudyName}`);
     ws.send(JSON.stringify({
-        type: 'READ_messages',
+        request_type: 'READ_messages',
         claudy_name: claudyName
     }));
 }
@@ -96,15 +97,15 @@ async function CREATE_message(claudyName, message) {
     renderMessage(claudyName, message);
 
     ws.send(JSON.stringify({
-        type: 'CREATE_message',
+        request_type: 'CREATE_message',
         claudy_name: claudyName,
-        message: message
+        user_message: message
     }));
 }
 
 ws.onmessage = (event) => {
     const data_dict = JSON.parse(event.data);
-    switch (data_dict.type) {
+    switch (data_dict.response_type) {
         case 'READ_message':
             renderMessage(data_dict.claudy_name, data_dict.message);
             break;

@@ -18,7 +18,7 @@ AGENTS = {}
 
 client = anthropic.Anthropic()
 
-# one step of work. this is synchronous and must be called in a async thread
+# one step of work. this is synchronous and must be called in a OS thread
 def work_step(claudy_name: str):
 
     print(f"work_step: {claudy_name}")
@@ -48,18 +48,25 @@ def work_step(claudy_name: str):
             "content": response.content[0].text,
         }
         save_msg(claudy_dir / "stream_context.jsonl", claudy_message)
-        READ_message(claudy_name, claudy_message["content"])
+        return claudy_message
     else:
-        READ_message(claudy_name, "AGENT ENDED: NO CONTENT")
-
+        return None # stops the agent
 
 # async loop per claudy
-
+# returns True if the agent should continue, False if it should stop
 async def _agent_loop(claudy_name: str, stop_event: asyncio.Event):
     try:
         while not stop_event.is_set():
-            await asyncio.to_thread(work_step, claudy_name)
-            # tiny yield so other tasks get time
+            # think of the OS thread as another computer (like a web call) that can be awaited
+            # to let other awaited stuff run, but must be serial itself
+            claudy_message = await asyncio.to_thread(work_step, claudy_name)
+
+            if claudy_message is None:
+                READ_message(claudy_name, {"role": "assistant", "content": "AGENT ENDED: NO CONTENT"})
+                break
+            READ_message(claudy_name, claudy_message)
+
+            # prevents spamming the api
             await asyncio.sleep(0.1)
     finally:
         # Make sure the event is set if we exit for any reason
@@ -70,11 +77,10 @@ async def _agent_loop(claudy_name: str, stop_event: asyncio.Event):
 #  PUBLIC API (CALL FROM FRONTEND ROUTES)
 # =========================
 
-async def START_agent(data_dict: dict):
+async def START_agent(claudy_name: str):
 
-    print(f"START_agent: {data_dict}")
+    print(f"START_agent: {claudy_name}")
 
-    claudy_name = data_dict['claudy_name']
     # Already running?
     state = AGENTS.get(claudy_name)
     if state is not None:
@@ -91,8 +97,7 @@ async def START_agent(data_dict: dict):
     }
 
 
-async def STOP_agent(data_dict: dict):
-    claudy_name = data_dict['claudy_name']
+async def STOP_agent(claudy_name: str):
     state = AGENTS.get(claudy_name)
     if state is None:
         return  # nothing to stop

@@ -21,9 +21,7 @@ def save_msg(path, msg):
         f.write(json.dumps(msg) + "\n")
 
 
-def CREATE_message(data_dict: dict):
-    claudy_name = data_dict['claudy_name']
-    user_message = data_dict['message']
+def CREATE_message(claudy_name: str, user_message: dict):
 
     claudy_dir = DATA_DIR / claudy_name
     claudy_dir.mkdir(parents=True, exist_ok=True)
@@ -33,33 +31,25 @@ def CREATE_message(data_dict: dict):
     stream_context.append(user_message)
 
 
-def READ_message(data_dict: dict):
-
-    print ("READ_message called: ", data_dict)
-
-    claudy_name = data_dict['claudy_name']
-    claudy_dir = DATA_DIR / claudy_name
-    claudy_dir.mkdir(parents=True, exist_ok=True)
-    stream_context = load_jsonl(claudy_dir / "stream_context.jsonl")
+def READ_message(claudy_name: str, claudy_message: dict):
 
     asyncio.create_task(
         socket_manager.get_connection().send_json({
-            "type": "READ_message",
+            "response_type": "READ_message",
             "claudy_name": claudy_name,
-            "message": stream_context[-1]
+            "message": claudy_message
         })
     )
 
-def READ_messages(data_dict: dict):
+def READ_messages(claudy_name: str):
 
-    claudy_name = data_dict['claudy_name']
     claudy_dir = DATA_DIR / claudy_name
     claudy_dir.mkdir(parents=True, exist_ok=True)
     stream_context = load_jsonl(claudy_dir / "stream_context.jsonl")
 
     asyncio.create_task(
         socket_manager.get_connection().send_json({
-            "type": "READ_messages",
+            "response_type": "READ_messages",
             "claudy_name": claudy_name,
             "messages": stream_context
         })

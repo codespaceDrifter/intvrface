@@ -32,18 +32,21 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             data_dict = json.loads(data)
+            request_type = data_dict.get('request_type')
+            claudy_name = data_dict.get('claudy_name')
+            user_message = data_dict.get('user_message')
+
+            match request_type:
+                case 'CREATE_message':
+                    CREATE_message(claudy_name, user_message)
+                case 'READ_messages':
+                    READ_messages(claudy_name)
+                case 'START_agent':
+                    await START_agent(claudy_name)
+                case 'STOP_agent':
+                    await STOP_agent(claudy_name)
             
-            if data_dict['type'] == 'CREATE_message':
-                CREATE_message(data_dict)
 
-            elif data_dict['type'] == 'READ_messages':
-                READ_messages(data_dict)
-
-            elif data_dict['type'] == 'START_agent':
-                await START_agent(data_dict)
-
-            elif data_dict['type'] == 'STOP_agent':
-                await STOP_agent(data_dict)
     except WebSocketDisconnect as e:
         print(f"WebSocketDisconnect: ", e.code, flush=True)
     finally:
