@@ -1,26 +1,51 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>intvrface</title>
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/cardy.css">
-  <link rel="stylesheet" href="css/claudy.css">
-  <script src="js/cardy.js" defer></script>
-  <script type = "module" src="js/claudy.js" defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>intvrface</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="board">
-    <div class="card claudy" id = "companion-card" data-claudy="companion">
-      <div class = "claudy-header">
-        <button class = "claudy-button toggle"></button>
-        <button class = "claudy-button summarize"></button>
-      </div>
-      <div class="claudy-messages"></div>
-      <textarea class="claudy-input"></textarea>
-      <div class="resize-handle"></div>
+    <div class="container">
+        <!-- Left sidebar: agent list -->
+        <aside class="sidebar">
+            <h2>agents</h2>
+            <div class="agent-controls">
+                <input type="text" id="new-agent-name" placeholder="agent name">
+                <input type="number" id="new-agent-port" placeholder="novnc port" value="6080">
+                <button id="create-btn">create</button>
+            </div>
+            <ul id="agent-list"></ul>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main">
+            <!-- Top: VNC viewer -->
+            <div class="vnc-container">
+                <div id="vnc-placeholder">select an agent to view</div>
+                <iframe id="vnc-frame" style="display:none;"></iframe>
+            </div>
+
+            <!-- Bottom: chat area -->
+            <div class="chat-container">
+                <div class="context-panel">
+                    <h3>context</h3>
+                    <div id="context-messages"></div>
+                </div>
+                <div class="input-area">
+                    <textarea id="chat-input" placeholder="type message to agent..."></textarea>
+                    <div class="buttons">
+                        <button id="send-btn">send</button>
+                        <button id="start-btn" disabled>start</button>
+                        <button id="stop-btn" disabled>stop</button>
+                        <button id="delete-btn" disabled>delete</button>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-  </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
