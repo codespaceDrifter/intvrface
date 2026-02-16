@@ -6,38 +6,31 @@ from prompt import CLAUDY_PROMPT, CONTEXT_SUMMARIZATION_PROMPT
 
 
 class Claude(Model):
-    """Claude API wrapper."""
+    """Claude API wrapper (async)."""
 
-    def __init__(self, model: str = "claude-opus-4-5-20251101"):
+    def __init__(self, model: str = "claude-opus-4-6"):
         self.model = model
-        self.client = anthropic.Anthropic()
+        self.client = anthropic.AsyncAnthropic()
 
-    def call(self, messages: list[dict], kv_cache: KVCache) -> tuple[str, KVCache]:
-        response = self.client.messages.create(
+    async def call(self, messages: list[dict], kv_cache: KVCache) -> tuple[str, KVCache]:
+        response = await self.client.messages.create(
             model=self.model,
-            max_tokens=8192,
+            max_tokens=16384,
             system=CLAUDY_PROMPT,
             messages=cast(list[MessageParam], messages),
         )
 
-        text = ""
-        for block in response.content:
-            if block.type == "text":
-                text += block.text
-
+        text = "".join(block.text for block in response.content if block.type == "text")
         return text, None
 
-    def summarize(self, messages: list[dict], kv_cache: KVCache) -> tuple[str, KVCache]:
+    async def summarize(self, messages: list[dict], kv_cache: KVCache) -> tuple[str, KVCache]:
         """Summarize context using CONTEXT_SUMMARIZATION_PROMPT."""
-        response = self.client.messages.create(
+        response = await self.client.messages.create(
             model=self.model,
             max_tokens=4096,
             system=CONTEXT_SUMMARIZATION_PROMPT,
             messages=cast(list[MessageParam], messages),
         )
 
-        text = ""
-        for block in response.content:
-            if block.type == "text":
-                text += block.text
+        text = "".join(block.text for block in response.content if block.type == "text")
         return text, None

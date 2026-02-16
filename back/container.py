@@ -21,9 +21,9 @@ Usage:
 """
 
 import subprocess
+import hashlib
 import time
 from pathlib import Path
-
 
 DOCKERFILE = """
 FROM ubuntu:22.04
@@ -33,7 +33,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # xvfb: virtual framebuffer (fake display for headless GUI)
 # x11-apps: basic X11 apps for testing
 # xdotool: simulate keyboard/mouse
-# scrot: screenshots (for model perception)
+# imagemagick: screenshots via import command (scrot doesn't work with xvfb)
 # xterm: terminal emulator
 # x11vnc: VNC server
 # websockify + novnc: browser-based VNC client
@@ -41,24 +41,33 @@ RUN apt-get update && apt-get install -y \\
     xvfb \\
     x11-apps \\
     xdotool \\
-    scrot \\
+    imagemagick \\
     xterm \\
     x11vnc \\
     novnc \\
     websockify \\
+    firefox \\
+    openbox \\
     && rm -rf /var/lib/apt/lists/*
 
-# display :99 is inside container only (isolated per container)
 ENV DISPLAY=:99
-
-# start xvfb + vnc + websockify (6080->5900) + xterm with logging, keep alive
-# websockify bridges websocket:6080 to vnc:5900 for noVNC
-CMD Xvfb :99 -screen 0 1280x720x24 & \
-    x11vnc -display :99 -forever -nopw -listen 0.0.0.0 -rfbport 5900 & \
-    websockify --web /usr/share/novnc 6080 localhost:5900 & \
-    sleep 1 && xterm -l -lf /home/agent/term.log & \
-    sleep infinity
+ENV MOZ_DISABLE_CONTENT_SANDBOX=1
 """
+
+# startup command — passed at runtime, change freely without rebuild
+STARTUP_CMD = (
+    "Xvfb :99 -screen 0 1280x720x24 & "
+    "sleep 2 && "
+    # disable X11 screen blanking/screensaver (semicolons so failure doesn't break chain)
+    "xset s off; xset -dpms; "
+    "x11vnc -display :99 -forever -nopw -listen 0.0.0.0 -rfbport 5900 & "
+    "websockify --web /usr/share/novnc 6080 localhost:5900 & "
+    # openbox: lightweight window manager (alt+Tab, alt+F4, window decorations)
+    "openbox & "
+    # script -f: logs terminal to file with immediate flush (xterm -l has buffering issues)
+    "sleep 3 && xterm -e 'script -f /home/agent/term.log' & "
+    "sleep infinity"
+)
 
 
 # data stored in ~/intvrface/
@@ -75,8 +84,11 @@ class Container:
         self.workspace = WORKSPACE_ROOT / name
         self._running = False
 
+    def _dockerfile_hash(self) -> str:
+        return hashlib.md5(DOCKERFILE.encode()).hexdigest()[:12]
+
     def build(self):
-        """Build the docker image (run once)."""
+        """Build the docker image. Writes hash to detect changes."""
         build_dir = Path.home() / "intvrface" / "docker_build"
         build_dir.mkdir(parents=True, exist_ok=True)
         (build_dir / "Dockerfile").write_text(DOCKERFILE)
@@ -86,50 +98,79 @@ class Container:
             ["docker", "build", "-t", self.image, str(build_dir)],
             check=True,
         )
+        # store hash so we know when Dockerfile changes
+        (build_dir / "hash").write_text(self._dockerfile_hash())
         print(f"Image '{self.image}' built.")
 
-    def start(self):
-        """Start the container. Reuses existing container if present (persistent)."""
-        # check if image exists, build if not
+    def _needs_rebuild(self) -> bool:
+        """Check if image is missing or Dockerfile changed since last build."""
         result = subprocess.run(
             ["docker", "images", "-q", self.image],
             capture_output=True, text=True
         )
         if not result.stdout.strip():
-            print(f"Image '{self.image}' not found, building...", flush=True)
+            return True
+        hash_file = Path.home() / "intvrface" / "docker_build" / "hash"
+        if not hash_file.exists():
+            return True
+        return hash_file.read_text().strip() != self._dockerfile_hash()
+
+    def start(self):
+        """Start the container. Auto-rebuilds image if Dockerfile changed."""
+        if self._needs_rebuild():
+            # nuke old containers using this image — they're stale
+            print("Dockerfile changed or image missing, rebuilding...", flush=True)
+            self._cleanup_all_containers()
+            subprocess.run(["docker", "rmi", self.image], capture_output=True)
             self.build()
-        else:
-            print(f"Image '{self.image}' already exists", flush=True)
 
         # check if container already exists
         result = subprocess.run(
-            ["docker", "ps", "-a", "-q", "-f", f"name={self.name}"],
+            ["docker", "ps", "-a", "-q", "-f", f"name=^{self.name}$"],
             capture_output=True, text=True
         )
 
         if result.stdout.strip():
-            # container exists, just start it
-            print(f"Container '{self.name}' already exists, resuming...", flush=True)
+            print(f"Container '{self.name}' exists, resuming...", flush=True)
             subprocess.run(["docker", "start", self.name], check=True)
         else:
-            # create new container
-            print(f"Container '{self.name}' not found, creating...", flush=True)
-            cmd = ["docker", "run", "-d", "--name", self.name,
-                   "-p", f"{self.novnc_port}:6080"]  # expose websockify for noVNC
-
-            assert self.workspace
+            print(f"Creating container '{self.name}'...", flush=True)
             self.workspace.mkdir(parents=True, exist_ok=True)
-            cmd.extend(["-v", f"{self.workspace.absolute()}:/home/agent", self.image])
-            subprocess.run(cmd, check=True)
+            subprocess.run([
+                "docker", "run", "-d", "--name", self.name,
+                "-p", f"{self.novnc_port}:6080",
+                "-v", f"{self.workspace.absolute()}:/home/agent",
+                self.image,
+                "bash", "-c", STARTUP_CMD,
+            ], check=True)
 
-        # wait for xvfb to be ready (verify with xdotool)
+        # wait for xvfb to be ready
         for _ in range(10):
             result = self.run("xdotool getdisplaygeometry")
             if "1280" in result:
                 break
             time.sleep(0.5)
+        # wait for xterm to spawn then focus it once
+        # windowfocus works without a WM (windowactivate doesn't)
+        for _ in range(10):
+            result = self.run("xdotool search --class XTerm")
+            if result.strip():
+                wid = result.strip().split('\n')[0]
+                self.run(f"xdotool windowfocus --sync {wid}")
+                break
+            time.sleep(0.5)
         self._running = True
         print(f"Container running. Workspace: {self.workspace}")
+
+    def _cleanup_all_containers(self):
+        """Remove all containers using this image (for rebuild)."""
+        result = subprocess.run(
+            ["docker", "ps", "-a", "-q", "--filter", f"ancestor={self.image}"],
+            capture_output=True, text=True
+        )
+        for cid in result.stdout.strip().split('\n'):
+            if cid:
+                subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
 
     def stop(self):
         """Stop the container (preserves state, can resume later)."""
@@ -138,10 +179,23 @@ class Container:
         print("Container stopped (state preserved).")
 
     def destroy(self):
-        """Stop AND remove the container (lose all state)."""
+        """Stop AND remove the container, workspace, and context."""
+        # clean root-owned workspace files via a temporary container
+        if self.workspace.exists():
+            subprocess.run([
+                "docker", "run", "--rm",
+                "-v", f"{self.workspace.absolute()}:/cleanup",
+                "ubuntu:22.04", "rm", "-rf", "/cleanup"
+            ], capture_output=True)
         subprocess.run(["docker", "stop", self.name], capture_output=True)
         subprocess.run(["docker", "rm", self.name], capture_output=True)
         self._running = False
+        import shutil
+        if self.workspace.exists():
+            shutil.rmtree(self.workspace)
+        context_dir = Path.home() / "intvrface" / "context" / self.name
+        if context_dir.exists():
+            shutil.rmtree(context_dir)
         print("Container destroyed.")
 
     def run(self, cmd: str) -> str:
@@ -152,10 +206,28 @@ class Container:
         )
         return result.stdout + result.stderr
 
+    def read_file(self, path: str) -> str:
+        """Read a file inside the container. No shell involved."""
+        result = subprocess.run(
+            ["docker", "exec", self.name, "cat", path],
+            capture_output=True, text=True,
+        )
+        return result.stdout
+
+    def write_file(self, path: str, content: str):
+        """Write content to a file inside the container via stdin. No shell escaping needed."""
+        self.run(f"mkdir -p $(dirname '{path}')")
+        subprocess.run(
+            ["docker", "exec", "-i", self.name, "tee", path],
+            input=content.encode(),
+            capture_output=True,
+        )
+
     def screenshot(self) -> Path:
         """Take screenshot, return path in workspace."""
         self.run("mkdir -p /home/agent/screenshots")
-        self.run("scrot /home/agent/screenshots/screen.png")
+        # xwd reads framebuffer silently (no focus stealing), convert does no X11
+        self.run("xwd -root -silent | convert xwd:- png:/home/agent/screenshots/screen.png")
         return self.workspace / "screenshots" / "screen.png"
 
     def click(self, button: int = 1):
@@ -175,15 +247,15 @@ class Container:
         button = 4 if direction == "up" else 5
         self.run(f"xdotool click {button}")
 
+
     def type_text(self, text: str):
         """Type text on keyboard."""
-        # escape special chars for shell
         escaped = text.replace("'", "'\\''")
         self.run(f"xdotool type '{escaped}'")
 
-    def key(self, key: str):
+    def key(self, combo: str):
         """Press a key combo. e.g. 'Return', 'ctrl+c', 'alt+Tab'."""
-        self.run(f"xdotool key {key}")
+        self.run(f"xdotool key {combo}")
 
     def move(self, x: int, y: int):
         """Move mouse to x,y."""

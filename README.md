@@ -34,7 +34,7 @@ model <- (in-memory messages + kv cache) <- context <- agent <- (LOOK/TERM) <- e
 
 ## commands (parsed by agent)
 
-agent parses >>>COMMAND<<< from model output. the model will be given a computer through docker + xvfb to inhabit. commands are embedded in the model's normal outputtokens formated as >>>command arguments <<<. commands are the following:
+agent parses `<func>COMMAND</func>` from model output. the model will be given a computer through docker + xvfb to inhabit. commands are embedded in the model's normal output tokens as `<func>COMMAND</func>` with arguments in `<param>...</param>` tags. content inside `<param>` is literal — no escaping needed. commands are the following:
 
 mouse commands:
 
@@ -51,7 +51,7 @@ mouse commands:
 keyboard commands:
 
 - TYPE text (type string. literal characters can be as long or short as model want)
-- KEY special_key + char . ' ' space as seperator (i.e. enter i.e. ctrl shift s ). both take a single string as argument.  
+- KEY special_key + char . ' ' space as seperator (i.e. Return i.e. ctrl shift s ). uses X11 keysym names: Return, BackSpace, Tab, Escape, Delete, Up, Down, Left, Right, Home, End, Page_Up, Page_Down, etc.
 
 perception commands:
 
@@ -67,17 +67,17 @@ auto-feedback: agent automatically adds TERM once after all keyboard commands (T
 CUA models such as in the CUALDO repo will just view screen as streaming video and have their weights directly decoded as keystrokes and mouse moves if so we interpret those model numerical outputs with agent as the intvrface still into the computer.
 
 
-## bash tools
+## file commands
 
-we code a series of python scripts added to bashrc for the model to more easily use a computer. these will be triggered with the TYPE command into terminal. scripts are following:
+native `<func>` commands handled directly by the agent via file I/O on the mounted workspace. these bypass the terminal entirely — no escaping issues. parsed by `command.py`, executed by `agent.py`. arguments use `<param>...</param>` tags — content inside is literal, no escaping needed for quotes, newlines, etc.
 
-read "file" "start" "end" (views file with line numbers. no start / end view entire)
-write "file" "content" overwrite whole file
-edit "file" "old" "new" -all (replaces the first instance of string old with string new. -all flag replaces all instances of old with new)
+- `<func>READ</func><param>file</param>` (view file with line numbers)
+- `<func>READ</func><param>file</param><param>start</param><param>end</param>` (view line range)
+- `<func>WRITE</func><param>file</param><param>content</param>` (overwrite whole file)
+- `<func>EDIT</func><param>file</param><param>old</param><param>new</param>` (replace first instance)
+- `<func>EDIT</func><param>file</param><param>old</param><param>new</param><param>-all</param>` (replace all instances)
 
-we use "" to seperate arguments. we use \" to escape double quotes inside the arguments
-
-maybe true AGI will use a actual editor like vim with streaming video and won't use this.
+not strictly needed — model could use nano/vim via TYPE, but that requires expensive screenshot loops for every edit. maybe true AGI with streaming video will just use an editor directly.
 
 ## model
 
@@ -102,26 +102,41 @@ original.jsonl
 kv_cache.pt
 ```
 
-jsonl format (matches Claude API exactly):
+four roles in storage:
+- **user** — human messages (chat input)
+- **assistant** — model thinking/text output
+- **command** — parsed `<func>...</func>` blocks from model output (marshaled back to assistant for API)
+- **environment** — auto-feedback from the computer (TERM output, LOOK screenshots)
+
+jsonl format:
 
 ```json
 {"role": "user", "content": [{"type": "text", "text": "complete this task"}]}
-{"role": "assistant", "content": [{"type": "text", "text": "ok i will begin >>>TYPE cd ~/Desktop<<<"}]}
-{"role": "user", "content": [{"type": "text", "text": "[TERM]\n~/Desktop"}, {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}}]}
+{"role": "assistant", "content": [{"type": "text", "text": "ok i will begin <func>TYPE cd ~/Desktop</func>"}]}
+{"role": "environment", "content": [{"type": "text", "text": "[TERM]\n~/Desktop"}, {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}}]}
 ```
 
-consecutive same-role messages are collapsed into one. images are base64 encoded inline (PNG only). only user/assistant roles - env feedback is user.
+consecutive same-role messages are collapsed into one. images are base64 encoded inline (PNG only).
+
+`context.marshal()` converts messages to Claude API format before sending — environment → user, command → assistant (API only supports user/assistant). consecutive same-role messages are re-collapsed after conversion. if the last marshaled message is assistant, WORK_MSG is appended as user (API requires user last). this injection is API-only — not stored in context or shown in frontend.
 
 streaming context gets trimmed when summary limit is reached. original context only adds, never deletes.
 
+## memory
+
+NOT IMPLEMENTED YET
+
+this is long term memory whereas context is working memory. in a human brain or AGI this would be weight change through online learning. in a current frozen weight LLM this could simply be file edits of a memory documents maybe in a folder strucutre it can read and write from.  
+perhaps this could be useful in thoughtgraph the app? or just more useful for talking to users in general. where the idea is the model learns about the user through each conversation and project and gets a compprehensive view of the user. and for thoughtgraph it's more explicit like the user can visually see the thoughts being gathered and how they relate to each other. so maybe the memory would be in a relational database that can be nicely displayed.  
+
 ## agent
 
-orchestrates model, context, and container. parses >>>COMMANDS<<< from model output.
+orchestrates model, context, and container. parses `<func>COMMANDS</func>` from model output.
 each turn ends with model outputing EOS or reaching max_tokens:
 
 1: model reads context and outputs
 2: output added to context (memory + original.jsonl)
-3: output parsed for >>>COMMANDS<<<
+3: output parsed for <func>COMMANDS</func>
 4: commands executed in container
 5: auto-feedback: TERM after keyboard, LOOK after mouse
 6: check for summarization, if needed summarize (replace in-memory with summary + last 5)
@@ -151,11 +166,3 @@ backend: python + fastapi
 database: jsonl
 sandboxing: docker
 
-## ui
-card like aesthetic. deleted now find in git history
-
-## todo
-
-- [ ] clean up frontend websocket code
-- [ ] multi-agent project pages (parallel/serial task graph)
-- [ ] persistent conversational agent with user notes

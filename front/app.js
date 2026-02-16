@@ -9,10 +9,11 @@ const newAgentName = document.getElementById('new-agent-name');
 const newAgentPort = document.getElementById('new-agent-port');
 const createBtn = document.getElementById('create-btn');
 const chatInput = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-btn');
 const startBtn = document.getElementById('start-btn');
-const stopBtn = document.getElementById('stop-btn');
+const pauseBtn = document.getElementById('pause-btn');
 const deleteBtn = document.getElementById('delete-btn');
+const chatModeBtn = document.getElementById('chat-mode-btn');
+let chatMode = false;
 const contextMessages = document.getElementById('context-messages');
 const vncPlaceholder = document.getElementById('vnc-placeholder');
 const vncFrame = document.getElementById('vnc-frame');
@@ -48,6 +49,7 @@ function handleMessage(msg) {
             agents = msg.agents;
             renderAgentList();
             updateButtons();
+            updateVnc();
             break;
 
         case 'context':
@@ -81,10 +83,12 @@ function renderAgentList() {
     agentList.innerHTML = '';
     agents.forEach(agent => {
         const li = document.createElement('li');
+        const status = agent.working ? 'working' : agent.container_on ? 'paused' : 'stopped';
+        const statusClass = agent.working ? 'working' : agent.container_on ? 'paused' : '';
         li.innerHTML = `
             <div>${agent.name}</div>
-            <div class="status ${agent.running ? 'running' : ''}">
-                ${agent.running ? 'running' : 'stopped'} | port ${agent.novnc_port}
+            <div class="status ${statusClass}">
+                ${status} | port ${agent.novnc_port}
             </div>
         `;
         if (agent.name === selectedAgent) {
@@ -100,21 +104,24 @@ function selectAgent(name) {
     selectedAgent = name;
     renderAgentList();
     updateButtons();
-
-    // Get context for this agent
+    updateVnc();
     send({ cmd: 'get_context', name: name });
+}
 
-    // Update VNC viewer
-    const agent = agents.find(a => a.name === name);
-    if (agent && agent.running) {
-        // Connect to noVNC - websockify serves novnc at /vnc.html
-        vncFrame.src = `http://localhost:${agent.novnc_port}/vnc.html?autoconnect=true`;
+// Update VNC iframe based on selected agent's state
+function updateVnc() {
+    const agent = agents.find(a => a.name === selectedAgent);
+    if (agent && agent.container_on) {
+        // only reload iframe if src changed (avoid reconnecting on every update)
+        const url = `http://localhost:${agent.novnc_port}/vnc.html?autoconnect=true`;
+        if (vncFrame.src !== url) vncFrame.src = url;
         vncFrame.style.display = 'block';
         vncPlaceholder.style.display = 'none';
     } else {
-        vncPlaceholder.textContent = agent ? 'agent not running' : 'select an agent to view';
+        vncPlaceholder.textContent = agent ? 'container stopped' : 'select an agent to view';
         vncPlaceholder.style.display = 'block';
         vncFrame.style.display = 'none';
+        vncFrame.src = '';
     }
 }
 
@@ -122,47 +129,82 @@ function selectAgent(name) {
 function updateButtons() {
     const agent = agents.find(a => a.name === selectedAgent);
     const hasSelection = !!agent;
-    const isRunning = agent?.running || false;
+    const isWorking = agent?.working || false;
+    const containerOn = agent?.container_on || false;
 
-    startBtn.disabled = !hasSelection || isRunning;
-    stopBtn.disabled = !hasSelection || !isRunning;
+    startBtn.disabled = !hasSelection || isWorking;
+    pauseBtn.disabled = !hasSelection || !isWorking;
     deleteBtn.disabled = !hasSelection;
-    sendBtn.disabled = !hasSelection || !isRunning;
+    chatInput.disabled = !hasSelection || !containerOn;
 }
 
 // Render context messages
+// render a thin collapsed row (for command/environment blocks)
+function addThinBlock(cssClass, label, content) {
+    const div = document.createElement('div');
+    div.className = `message ${cssClass}`;
+    const roleDiv = document.createElement('div');
+    roleDiv.className = 'role';
+    roleDiv.textContent = label;
+    roleDiv.style.cursor = 'pointer';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'content collapsed';
+    if (typeof content === 'string') {
+        contentDiv.textContent = content;
+    } else {
+        contentDiv.appendChild(content);
+    }
+    roleDiv.onclick = () => contentDiv.classList.toggle('collapsed');
+    div.appendChild(roleDiv);
+    div.appendChild(contentDiv);
+    contextMessages.appendChild(div);
+}
+
 function renderContext(messages) {
     contextMessages.innerHTML = '';
     messages.forEach(msg => {
-        const div = document.createElement('div');
-        div.className = `message ${msg.role}`;
+        if (msg.role === 'command') {
+            // each content block = its own thin row
+            (msg.content || []).forEach(block => {
+                const text = block.text || '';
+                const name = text.match(/<func>(\w+)/)?.[1] || 'CMD';
+                addThinBlock('command', name, text);
+            });
 
-        const roleDiv = document.createElement('div');
-        roleDiv.className = 'role';
-        roleDiv.textContent = msg.role;
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-
-        // Extract text from content blocks
-        let text = '';
-        if (msg.content) {
-            msg.content.forEach(block => {
-                if (block.type === 'text') {
-                    text += block.text + '\n';
-                } else if (block.type === 'image') {
-                    text += '[IMAGE]\n';
+        } else if (msg.role === 'environment') {
+            // each content block = its own thin row
+            (msg.content || []).forEach(block => {
+                if (block.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = `data:${block.source.media_type};base64,${block.source.data}`;
+                    img.className = 'context-img';
+                    addThinBlock('environment', 'LOOK', img);
+                } else {
+                    const text = block.text || '';
+                    const label = text.startsWith('[TERM]') ? 'TERM'
+                        : text.startsWith('[READ') ? 'READ'
+                        : text.startsWith('[WRITE') ? 'WRITE'
+                        : text.startsWith('[EDIT') ? 'EDIT' : 'ENV';
+                    addThinBlock('environment', label, text);
                 }
             });
-        }
-        contentDiv.textContent = text.trim();
 
-        div.appendChild(roleDiv);
-        div.appendChild(contentDiv);
-        contextMessages.appendChild(div);
+        } else {
+            // user + assistant — normal blocks
+            const div = document.createElement('div');
+            div.className = `message ${msg.role}`;
+            const roleDiv = document.createElement('div');
+            roleDiv.className = 'role';
+            roleDiv.textContent = msg.role;
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+            contentDiv.textContent = msg.content?.map(b => b.text || '').join('') || '';
+            div.appendChild(roleDiv);
+            div.appendChild(contentDiv);
+            contextMessages.appendChild(div);
+        }
     });
 
-    // Scroll to bottom
     contextMessages.scrollTop = contextMessages.scrollHeight;
 }
 
@@ -189,9 +231,9 @@ startBtn.onclick = () => {
     }
 };
 
-stopBtn.onclick = () => {
+pauseBtn.onclick = () => {
     if (selectedAgent) {
-        send({ cmd: 'stop', name: selectedAgent });
+        send({ cmd: 'pause', name: selectedAgent });
     }
 };
 
@@ -203,19 +245,22 @@ deleteBtn.onclick = () => {
     }
 };
 
-sendBtn.onclick = () => {
-    const text = chatInput.value.trim();
-    if (text && selectedAgent) {
-        send({ cmd: 'chat', name: selectedAgent, text: text });
-        chatInput.value = '';
-    }
+chatModeBtn.onclick = () => {
+    if (!selectedAgent) return;
+    chatMode = !chatMode;
+    chatModeBtn.classList.toggle('active', chatMode);
+    send({ cmd: 'chat_mode', name: selectedAgent, enabled: chatMode });
 };
 
 // Enter to send (Shift+Enter for newline)
 chatInput.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendBtn.click();
+        const text = chatInput.value.trim();
+        if (text && selectedAgent) {
+            send({ cmd: 'chat', name: selectedAgent, text: text });
+            chatInput.value = '';
+        }
     }
 };
 

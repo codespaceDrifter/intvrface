@@ -3,11 +3,14 @@ import base64
 import torch
 from pathlib import Path
 
-# kv cache type - tuple of (key, value) per layer, or None for API models
+# outer tuple: one entry per layer (...  means repeat N layers)
+# inner tuple: (key_tensor, value_tensor) for that layer
+# each tensor shape: (batch, heads, seq_len, head_dim)
+# None for API models that don't expose kv cache
 KVCache = tuple[tuple[torch.Tensor, torch.Tensor], ...] | None
 
 CONTEXT_ROOT = Path.home() / "intvrface" / "context"
-MAX_WORDS = 30000
+MAX_WORDS = 64000
 PRESERVE_LAST = 5
 
 
@@ -16,12 +19,12 @@ class Context:
     Manages context for an agent session.
 
     Files in context/{name}/:
-        original.jsonl   - full log, never deleted
+        original.jsonl   - full log, append-only archive (never read at runtime)
+        working.jsonl    - current working memory (loaded on startup)
         kv_cache.pt      - cached key/values for local models
 
-    Context kept in memory (self.messages), loaded from original.jsonl on init.
-    On summarization, in-memory is trimmed but original.jsonl only appends.
-    Format matches Claude API exactly. Consecutive same-role messages collapsed.
+    On startup, loads working.jsonl (compact). Falls back to original.jsonl if no working.jsonl.
+    On summarization, working.jsonl is overwritten with summary + last N messages.
     """
 
     def __init__(self, name: str):
@@ -30,23 +33,61 @@ class Context:
         self.folder.mkdir(parents=True, exist_ok=True)
 
         self.original_path = self.folder / "original.jsonl"
+        self.working_path = self.folder / "working.jsonl"
         self.kv_path = self.folder / "kv_cache.pt"
 
         self.original_path.touch(exist_ok=True)
+        self.working_path.touch(exist_ok=True)
+        self.messages: list[dict] = [json.loads(line) for line in self.working_path.read_text().strip().splitlines()]
 
-        # load original into memory (triggers summarization if too long)
-        self.messages: list[dict] = []
-        text = self.original_path.read_text().strip()
+    def _collapse_append(self, lst: list[dict], role: str, block: dict):
+        """Append a content block to a message list, collapsing consecutive same-role."""
+        if lst and lst[-1]["role"] == role:
+            lst[-1]["content"].append(block)
+        else:
+            lst.append({"role": role, "content": [block]})
+
+    def _append_to_file(self, path: Path, role: str, block: dict):
+        """Append a content block to a jsonl file, collapsing consecutive same-role."""
+        text = path.read_text().strip()
         lines = text.split('\n') if text else []
-        for line in lines:
-            self.messages.append(json.loads(line))
+        if lines:
+            last_entry = json.loads(lines[-1])
+            if last_entry["role"] == role:
+                last_entry["content"].append(block)
+                lines[-1] = json.dumps(last_entry)
+                path.write_text('\n'.join(lines) + '\n')
+                return
+        with open(path, "a") as f:
+            f.write(json.dumps({"role": role, "content": [block]}) + "\n")
+
+    def marshal(self) -> list[dict]:
+        """
+        Convert messages to Claude API format.
+        environment → user, command → assistant (API only has user/assistant).
+        If last message is assistant/command, adds WORK_MSG as [SYSTEM] environment
+        to actual context (stored + visible in frontend).
+        """
+        from prompt import WORK_MSG
+        if self.messages and self.messages[-1]["role"] in ("assistant", "command"):
+            self.add("environment", content=f"[SYSTEM]\n{WORK_MSG}")
+        out = []
+        for msg in self.messages:
+            r = msg["role"]
+            role = "user" if r == "environment" else "assistant" if r == "command" else r
+            for block in msg["content"]:
+                self._collapse_append(out, role, block)
+        return out
 
     def add(self, role: str, content: str | None = None, image_bytes: bytes | None = None):
         """Add a message to context."""
-        assert role in ("user", "assistant")
+        assert role in ("user", "assistant", "environment", "command")
         assert content or image_bytes
 
         if image_bytes:
+            # original: 0-255 (8 bit as a unit)
+            # base64: 6 bit as a unit mappable to ASCII character then to it's 8 bit code
+            # utf8: typecasts the byte data to string, actual data stays the same
             img_data = base64.standard_b64encode(image_bytes).decode("utf-8")
             block = {
                 "type": "image",
@@ -56,24 +97,9 @@ class Context:
             assert content
             block = {"type": "text", "text": content}
 
-        # add to memory, collapsing same-role
-        if self.messages and self.messages[-1]["role"] == role:
-            self.messages[-1]["content"].append(block)
-        else:
-            self.messages.append({"role": role, "content": [block]})
-
-        # append to disk, collapsing same-role
-        text = self.original_path.read_text().strip()
-        lines = text.split('\n') if text else []
-        if lines:
-            last_entry = json.loads(lines[-1])
-            if last_entry["role"] == role:
-                last_entry["content"].append(block)
-                lines[-1] = json.dumps(last_entry)
-                self.original_path.write_text('\n'.join(lines) + '\n')
-                return
-        with open(self.original_path, "a") as f:
-            f.write(json.dumps({"role": role, "content": [block]}) + "\n")
+        self._collapse_append(self.messages, role, block)
+        self._append_to_file(self.original_path, role, block)
+        self._append_to_file(self.working_path, role, block)
 
 
     def count_words(self) -> int:
@@ -92,25 +118,26 @@ class Context:
         return self.count_words() >= MAX_WORDS
 
     def apply_summary(self, summary: str):
-        """Replace in-memory context with summary + last N messages."""
+        """Replace working memory with summary + last N messages."""
         if len(self.messages) <= PRESERVE_LAST:
             return  # everything preserved anyway, summary would just add bloat
         last_msgs = self.messages[-PRESERVE_LAST:]
 
         summary_block = {"type": "text", "text": f"SUMMARIZED CONTEXT: {summary}"}
 
-        # append summary to original (never delete from original)
-        with open(self.original_path, "a") as f:
-            f.write(json.dumps({"role": "assistant", "content": [summary_block]}) + "\n")
+        # archive summary to original
+        self._append_to_file(self.original_path, "assistant", summary_block)
 
-        # rebuild in-memory messages: summary + last N
+        # rebuild in-memory: summary + last N
         self.messages = [{"role": "assistant", "content": [summary_block]}]
         for msg in last_msgs:
             for block in msg["content"]:
-                if self.messages[-1]["role"] == msg["role"]:
-                    self.messages[-1]["content"].append(block)
-                else:
-                    self.messages.append({"role": msg["role"], "content": [block]})
+                self._collapse_append(self.messages, msg["role"], block)
+
+        # overwrite working.jsonl with current in-memory state
+        self.working_path.write_text(
+            '\n'.join(json.dumps(msg) for msg in self.messages) + '\n'
+        )
 
     def load_kv(self) -> KVCache:
         if self.kv_path.exists():
