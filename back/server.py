@@ -157,7 +157,7 @@ async def websocket_endpoint(ws: WebSocket):
                     async def on_turn(response, messages, _name=name):
                         await broadcast({"type": "context", "name": _name, "messages": messages})
 
-                    asyncio.create_task(info["agent"].work(on_turn))
+                    info["work_task"] = asyncio.create_task(info["agent"].work(on_turn))
 
                 await broadcast({"type": "agents", "agents": get_agents_list()})
 
@@ -201,17 +201,23 @@ async def websocket_endpoint(ws: WebSocket):
                 info["chat_mode"] = enabled
                 info["agent"].chat_mode = enabled
                 if enabled:
-                    # entering chat mode: pause work loop
+                    # entering chat mode: cancel work loop immediately
                     if info["working"]:
                         info["agent"].pause()
                         info["working"] = False
+                        if info.get("work_task") and not info["work_task"].done():
+                            info["work_task"].cancel()
+                            info["work_task"] = None
                 else:
-                    # leaving chat mode: restart work loop
+                    # leaving chat mode: cancel pending chat turn, restart work loop
+                    if info.get("chat_task") and not info["chat_task"].done():
+                        info["chat_task"].cancel()
+                        info["chat_task"] = None
                     if info["container_on"] and not info["working"]:
                         info["working"] = True
                         async def on_turn(response, messages, _name=name):
                             await broadcast({"type": "context", "name": _name, "messages": messages})
-                        asyncio.create_task(info["agent"].work(on_turn))
+                        info["work_task"] = asyncio.create_task(info["agent"].work(on_turn))
 
                 await broadcast({"type": "agents", "agents": get_agents_list()})
 
@@ -238,9 +244,11 @@ async def websocket_endpoint(ws: WebSocket):
                             await _agent.turn()
                             print(f"[chat_mode] turn done for {_name}")
                             await broadcast({"type": "context", "name": _name, "messages": _agent.context.messages})
+                        except asyncio.CancelledError:
+                            print(f"[chat_mode] cancelled for {_name}")
                         except Exception as e:
                             print(f"[chat_mode] ERROR: {e}")
-                    asyncio.create_task(do_chat_turn())
+                    info["chat_task"] = asyncio.create_task(do_chat_turn())
 
             elif cmd == "get_context":
                 name = msg.get("name")
