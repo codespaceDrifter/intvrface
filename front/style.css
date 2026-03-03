@@ -101,6 +101,10 @@ body {
     color: #e87d2a;
 }
 
+#agent-list li .status.stopped {
+    color: #444;
+}
+
 /* Middle panel: screen + footer buttons */
 .mid-panel {
     flex: 1;

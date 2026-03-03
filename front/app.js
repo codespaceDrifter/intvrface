@@ -1,19 +1,19 @@
 // WebSocket connection
 let ws = null;
-let agents = [];
+// {name: {container_on, working, novnc_port}} — same format as backend
+let agents = {};
 let selectedAgent = null;
+let chatMode = false;
 
 // DOM elements
 const agentList = document.getElementById('agent-list');
 const newAgentName = document.getElementById('new-agent-name');
-const newAgentPort = document.getElementById('new-agent-port');
 const createBtn = document.getElementById('create-btn');
 const chatInput = document.getElementById('chat-input');
 const startBtn = document.getElementById('start-btn');
 const pauseBtn = document.getElementById('pause-btn');
 const deleteBtn = document.getElementById('delete-btn');
 const chatModeBtn = document.getElementById('chat-mode-btn');
-let chatMode = false;
 const contextMessages = document.getElementById('context-messages');
 const vncPlaceholder = document.getElementById('vnc-placeholder');
 const vncFrame = document.getElementById('vnc-frame');
@@ -27,11 +27,13 @@ function connect() {
         console.log('Connected to server');
     };
 
+    // incoming messages
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         handleMessage(msg);
     };
 
+    // auto reconnects when connection lost
     ws.onclose = () => {
         console.log('Disconnected, reconnecting in 2s...');
         setTimeout(connect, 2000);
@@ -58,13 +60,6 @@ function handleMessage(msg) {
             }
             break;
 
-        case 'response':
-            if (msg.name === selectedAgent) {
-                // response received, context will be updated separately
-                console.log('Response:', msg.text);
-            }
-            break;
-
         case 'error':
             alert('Error: ' + msg.msg);
             break;
@@ -73,7 +68,7 @@ function handleMessage(msg) {
 
 // Send command to server
 function send(cmd) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws && ws.readyState === WebSocket.OPEN){ //WEBSOCKET.OPEN is a class constant 1 
         ws.send(JSON.stringify(cmd));
     }
 }
@@ -81,22 +76,22 @@ function send(cmd) {
 // Render agent list
 function renderAgentList() {
     agentList.innerHTML = '';
-    agents.forEach(agent => {
+    for (const [name, info] of Object.entries(agents)) {
         const li = document.createElement('li');
-        const status = agent.working ? 'working' : agent.container_on ? 'paused' : 'stopped';
-        const statusClass = agent.working ? 'working' : agent.container_on ? 'paused' : '';
+        const status = info.working ? 'working' : info.container_on ? 'paused' : 'stopped';
+        const statusClass = info.working ? 'working' : info.container_on ? 'paused' : '';
         li.innerHTML = `
-            <div>${agent.name}</div>
+            <div>${name}</div>
             <div class="status ${statusClass}">
-                ${status} | port ${agent.novnc_port}
+                ${status} | port ${info.novnc_port}
             </div>
         `;
-        if (agent.name === selectedAgent) {
+        if (name === selectedAgent) {
             li.classList.add('selected');
         }
-        li.onclick = () => selectAgent(agent.name);
+        li.onclick = () => selectAgent(name);
         agentList.appendChild(li);
-    });
+    }
 }
 
 // Select an agent
@@ -110,7 +105,7 @@ function selectAgent(name) {
 
 // Update VNC iframe based on selected agent's state
 function updateVnc() {
-    const agent = agents.find(a => a.name === selectedAgent);
+    const agent = selectedAgent ? agents[selectedAgent] : null;
     if (agent && agent.container_on) {
         // only reload iframe if src changed (avoid reconnecting on every update)
         const url = `http://localhost:${agent.novnc_port}/vnc.html?autoconnect=true`;
@@ -127,9 +122,9 @@ function updateVnc() {
 
 // Update button states
 function updateButtons() {
-    const agent = agents.find(a => a.name === selectedAgent);
-    const hasSelection = !!agent;
-    const isWorking = agent?.working || false;
+    const agent = selectedAgent ? agents[selectedAgent] : null;
+    const hasSelection = !!agent; //converts to boolean
+    const isWorking = agent?.working || false; // ?. is a javascript query that could return undefined. || in javascript is a hierachy of truthyness.
     const containerOn = agent?.container_on || false;
 
     startBtn.disabled = !hasSelection || isWorking;
@@ -149,7 +144,7 @@ function addThinBlock(cssClass, label, content) {
     roleDiv.style.cursor = 'pointer';
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content collapsed';
-    if (typeof content === 'string') {
+    if (typeof content === 'string') { //content could be string or image
         contentDiv.textContent = content;
     } else {
         contentDiv.appendChild(content);
@@ -211,18 +206,12 @@ function renderContext(messages) {
 // Event listeners
 createBtn.onclick = () => {
     const name = newAgentName.value.trim();
-    const port = parseInt(newAgentPort.value) || 6080;
-
     if (!name) {
         alert('Please enter agent name');
         return;
     }
-
-    send({ cmd: 'create', name: name, novnc_port: port });
+    send({ cmd: 'create', name: name });
     newAgentName.value = '';
-
-    // Auto-increment port for next agent
-    newAgentPort.value = port + 1;
 };
 
 startBtn.onclick = () => {
@@ -261,27 +250,6 @@ chatInput.onkeydown = (e) => {
             send({ cmd: 'chat', name: selectedAgent, text: text });
             chatInput.value = '';
         }
-    }
-};
-
-// Arrow keys to cycle agents
-document.onkeydown = (e) => {
-    if (document.activeElement === chatInput) return;
-
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (agents.length === 0) return;
-
-        const currentIndex = agents.findIndex(a => a.name === selectedAgent);
-        let newIndex;
-
-        if (e.key === 'ArrowUp') {
-            newIndex = currentIndex <= 0 ? agents.length - 1 : currentIndex - 1;
-        } else {
-            newIndex = currentIndex >= agents.length - 1 ? 0 : currentIndex + 1;
-        }
-
-        selectAgent(agents[newIndex].name);
     }
 };
 

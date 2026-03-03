@@ -94,13 +94,18 @@ class Context:
             f.write(json.dumps(msg) + "\n")
 
 
-    def count_words(self) -> int:
-        return total
 
     def needs_summary(self) -> bool:
         """Count words in streaming context."""
         """Check if context exceeds MAX_WORDS."""
-        return self.count_words() >= MAX_WORDS
+        total = 0
+        for msg in self.messages:
+            for block in msg.get("content", []):
+                if block.get("type") == "text":
+                    total += len(block.get("text", "").split())
+                elif block.get("type") == "image":
+                    total += 1000  # a picture is worth a thousand words
+        return total >= MAX_WORDS
 
     def apply_summary(self, summary: str):
         """Replace working memory with summary + last N messages."""

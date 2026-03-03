@@ -74,8 +74,9 @@ native `<func>` commands handled directly by the agent via file I/O on the mount
 - `<func>READ</func><param>file</param>` (view file with line numbers)
 - `<func>READ</func><param>file</param><param>start</param><param>end</param>` (view line range)
 - `<func>WRITE</func><param>file</param><param>content</param>` (overwrite whole file)
-- `<func>EDIT</func><param>file</param><param>old</param><param>new</param>` (replace first instance)
-- `<func>EDIT</func><param>file</param><param>old</param><param>new</param><param>-all</param>` (replace all instances)
+- `<func>EDIT</func><param>file</param><param>old</param><param>new</param><param>0</param>` (replace 1st instance, 0-indexed)
+- `<func>EDIT</func><param>file</param><param>old</param><param>new</param><param>N</param>` (replace Nth instance, 0-indexed)
+- `<func>EDIT</func><param>file</param><param>old</param><param>new</param><param>all</param>` (replace all instances)
 
 not strictly needed — model could use nano/vim via TYPE, but that requires expensive screenshot loops for every edit. maybe true AGI with streaming video will just use an editor directly.
 
@@ -165,4 +166,26 @@ frontend: html/css/js
 backend: python + fastapi
 database: jsonl
 sandboxing: docker
+
+## Test Prompts
+
+### Interactive Brain Map
+
+```
+build me an interactive website that visualizes the human brain.
+
+step 1: research first. open chromium and search for information about brain regions, their functions, neurotransmitter systems, neuron types, and signal speeds. look at multiple sources. take your time reading — don't rush this. save your research notes to /home/agent/notes.md as you go.
+
+step 2: plan the site. based on your research, write a brief plan in /home/agent/plan.md — what regions you'll include, what data each region shows, and how the interaction will work.
+
+step 3: build it. create an interactive single-page website at /home/agent/brain/index.html using HTML/CSS/JS (no frameworks). it should have:
+- a visual map/diagram of the brain with clickable regions (prefrontal cortex, hippocampus, amygdala, cerebellum, brainstem, visual cortex, motor cortex, etc.)
+- when you click a region, show a detail panel with: main functions, primary neurotransmitters, dominant neuron types, signal propagation speed, and a fun fact
+- make it visually striking — dark background, glowing regions, smooth animations
+- all data should come from your actual research, not guesses
+
+step 4: test it visually. serve the site with `python3 -m http.server 8080 -d /home/agent/brain &` and open it in chromium at localhost:8080. click through every region. check that the layout looks good, text is readable, animations work, and all regions are clickable.
+
+step 5: polish. based on what you see, fix any visual issues — colors that clash, text that overflows, regions that are hard to click, animations that feel off. make at least 3 specific improvements based on your visual inspection. test again after each change.
+```
 
